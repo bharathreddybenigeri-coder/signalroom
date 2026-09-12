@@ -1,0 +1,1 @@
+export default function Loading() { return <div className="flex min-h-screen items-center justify-center bg-[#f8f8f6] text-sm font-bold text-[#898984]">Loading signalroom…</div>; }

@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { --background: 40 20% 97%; --foreground: 60 5% 14%; --card: 0 0% 100%; --card-foreground: 60 5% 14%; --popover: 0 0% 100%; --popover-foreground: 60 5% 14%; --primary: 60 5% 14%; --primary-foreground: 0 0% 100%; --secondary: 40 12% 94%; --secondary-foreground: 60 5% 14%; --muted: 40 12% 94%; --muted-foreground: 40 3% 52%; --accent: 40 12% 94%; --accent-foreground: 60 5% 14%; --destructive: 4 80% 62%; --destructive-foreground: 0 0% 100%; --border: 40 8% 89%; --input: 40 8% 89%; --ring: 4 80% 62%; --radius: 0.75rem; }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  button, select { font: inherit; }
+  ::selection { background: rgba(255, 107, 95, .18); }
+}
+@layer utilities {
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #d9d9d5 transparent; }
+  .scrollbar-thin::-webkit-scrollbar { width: 7px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #d9d9d5; border-radius: 999px; }
+}
