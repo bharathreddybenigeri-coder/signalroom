@@ -153,21 +153,21 @@ export default function DashboardClient() {
       label: "Production health",
       description: "API + baseline latency",
       color: "#1fb8a8",
-      preset: { mode: "line" as const, range: "30m" as const, bucket: "raw" as const, series: [0, 1], stress: 3000, view: "Overview" as const },
+      preset: { mode: "line" as const, range: "30m" as const, bucket: "raw" as const, series: [0, 1], stress: 3000 },
     },
     {
       id: "growth",
       label: "Growth signals",
       description: "Signal + anomaly trend",
       color: "#7058d8",
-      preset: { mode: "scatter" as const, range: "2h" as const, bucket: "1m" as const, series: [2, 3], stress: 15000, view: "Live streams" as const },
+      preset: { mode: "scatter" as const, range: "2h" as const, bucket: "1m" as const, series: [2, 3], stress: 15000 },
     },
     {
       id: "experiment",
       label: "Experiment lab",
       description: "Full spectrum \u00b7 stress",
       color: "#f4b23e",
-      preset: { mode: "heatmap" as const, range: "24h" as const, bucket: "5m" as const, series: [0, 1, 2, 3, 4], stress: 50000, view: "Data explorer" as const },
+      preset: { mode: "heatmap" as const, range: "24h" as const, bucket: "5m" as const, series: [0, 1, 2, 3, 4], stress: 50000 },
     },
   ];
 
@@ -179,7 +179,6 @@ export default function DashboardClient() {
     setRange(c.preset.range);
     setBucket(c.preset.bucket);
     setStress(c.preset.stress);
-    setActiveNav(c.preset.view);
     setMobileNav(false);
     const target = new Set(c.preset.series);
     [0, 1, 2, 3, 4].forEach((s) => {
@@ -187,6 +186,13 @@ export default function DashboardClient() {
       const shouldBeOn = target.has(s);
       if (on !== shouldBeOn) toggleSeries(s);
     });
+  };
+
+  // Any manual nav or mode change clears the collection selection so the sidebar stays honest.
+  const handleNavChange = (label: string) => {
+    setActiveNav(label);
+    setMobileNav(false);
+    setActiveCollection(null);
   };
 
   const modes = [
@@ -232,10 +238,7 @@ export default function DashboardClient() {
           {navItems.map(({ label, icon: Icon, count }) => (
             <button
               key={label}
-              onClick={() => {
-                setActiveNav(label);
-                setMobileNav(false);
-              }}
+              onClick={() => handleNavChange(label)}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[13px] font-bold transition ${
                 activeNav === label
                   ? "bg-white text-[#242422] shadow-[0_3px_0_#e7e7e4,0_8px_16px_rgba(20,20,25,.05)]"
