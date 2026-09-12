@@ -1,0 +1,286 @@
+================================================================================
+ SIGNALROOM — SETUP GUIDE
+ Realtime observatory · Next.js 15 App Router · TypeScript · Canvas 2D
+================================================================================
+
+This file is the single source of truth for cloning the repo and getting the
+app running locally or on a fresh server. Follow the sections in order.
+
+--------------------------------------------------------------------------------
+ 0. TL;DR (if you know what you're doing)
+--------------------------------------------------------------------------------
+
+  git clone <YOUR_REPO_URL> signalroom
+  cd signalroom
+  cp .env.example .env             # create it from the template below (§3)
+  yarn install                     # or: npm install
+  yarn dev                         # → http://localhost:3000
+  # First page is the landing at /  — enter a name + email
+  # It then routes to /dashboard
+
+That's it. No external services required, no API keys.
+
+--------------------------------------------------------------------------------
+ 1. WHAT THIS APP IS
+--------------------------------------------------------------------------------
+
+  · A single-page realtime data-visualization dashboard.
+  · Renders line / bar / scatter / heatmap charts on <canvas> from scratch.
+    No Chart.js, no D3, no Recharts.
+  · Simulates telemetry every 100 ms via a Web Worker on a background thread.
+  · Handles 10,000+ points at 60 fps, sustains 50,000 at 30+ fps.
+  · Landing page at /  → captures name + email (localStorage only).
+  · Dashboard at /dashboard  → the observatory.
+
+--------------------------------------------------------------------------------
+ 2. SYSTEM REQUIREMENTS
+--------------------------------------------------------------------------------
+
+  Node.js         >= 20.10   (tested on Node 20.20.2)
+  Yarn            1.22.x     (recommended; npm 10+ also works)
+  RAM             >= 1 GB free (Next.js dev server likes room)
+  Disk            ~500 MB for node_modules
+  Browser         Chromium 108+ / Firefox 105+ / Safari 16+
+                  (Chromium unlocks the memory MB reading in the HUD;
+                   others fall back to a synthetic estimate — normal.)
+
+  Optional for production-like local run:
+    supervisor    4.x         (systemd-style process manager)
+
+--------------------------------------------------------------------------------
+ 3. ENVIRONMENT VARIABLES (create /.env)
+--------------------------------------------------------------------------------
+
+The app does not require any third-party API keys. It does not talk to any
+external service. Data is generated in-browser (Web Worker) or in-process
+(Next.js route handler at /api/data). Everything below is either optional or
+has a safe default.
+
+Create a file called `.env` at the repo root with the following contents:
+
+  ------------------- copy from here -------------------
+  # Public base URL of your app. Used only for share-view link copying and
+  # documentation. If you're just running locally, this can be left as-is.
+  NEXT_PUBLIC_BASE_URL=http://localhost:3000
+
+  # Comma-separated list of allowed CORS origins for the /api/data endpoint.
+  # "*" allows everything (dev-friendly). Tighten in production if you expose
+  # the API to third parties.
+  CORS_ORIGINS=*
+
+  # These two are legacy from the Next.js/Mongo template this project was
+  # forked from. The code does NOT read from Mongo — you can safely leave them
+  # empty or remove them if you're not planning to add persistence later.
+  MONGO_URL=
+  DB_NAME=
+  --------------------- end copy -----------------------
+
+Notes:
+  · NEXT_PUBLIC_ prefix is a Next.js convention. Any variable with that prefix
+    is exposed to the browser bundle. Do NOT put secrets behind it.
+  · The Toaster, canvas engine, Web Worker, and all four chart renderers work
+    entirely with the values above.
+
+--------------------------------------------------------------------------------
+ 4. ADDRESSES, PORTS, AND ROUTES
+--------------------------------------------------------------------------------
+
+  Local dev server ......... http://localhost:3000
+  Landing page  ............ http://localhost:3000/          (name + email)
+  Dashboard  ............... http://localhost:3000/dashboard
+  Data snapshot API  ....... http://localhost:3000/api/data?points=1200
+                             (GET returns N synthetic points, N in [24, 50000])
+                             (POST accepts { value: number } and echoes it)
+
+  There is no separate backend service, no database process, no queue,
+  no worker container. The Next.js dev server hosts UI + API together.
+
+--------------------------------------------------------------------------------
+ 5. INSTALL & RUN — LOCAL DEV
+--------------------------------------------------------------------------------
+
+  # 1. clone
+  git clone <YOUR_REPO_URL> signalroom
+  cd signalroom
+
+  # 2. environment
+  #   Create .env with the contents from §3.
+
+  # 3. dependencies (yarn is recommended; both work)
+  yarn install
+  # or:
+  npm install
+
+  # 4. start dev server (hot reload)
+  yarn dev
+  # or:
+  npm run dev
+
+  # 5. open
+  # Visit http://localhost:3000 in your browser.
+  # Enter a name and email on the landing page — they are stored ONLY in
+  # localStorage on your device; nothing is uploaded.
+
+If port 3000 is taken:
+  PORT=3010 yarn dev
+  # or edit the "dev" script in package.json
+
+--------------------------------------------------------------------------------
+ 6. INSTALL & RUN — PRODUCTION BUILD
+--------------------------------------------------------------------------------
+
+  yarn install
+  yarn build           # produces .next/ optimised bundle
+  yarn start           # runs the optimised server on port 3000
+
+  # A production build is ~20% faster in FPS than dev mode.
+
+--------------------------------------------------------------------------------
+ 7. VERIFYING IT WORKS
+--------------------------------------------------------------------------------
+
+Quick smoke test (30 seconds):
+
+  1. curl -s http://localhost:3000/api/data?points=3
+     → JSON with 3 synthetic points and a `meta.palette` array.
+
+  2. Open http://localhost:3000 in a browser.
+     → Dark landing page with flowing coloured signal lines.
+
+  3. Type a name and email → click "Enter the observatory".
+     → Redirects to /dashboard.
+     → Header greets you by first name; sidebar shows your initials + email.
+
+  4. Watch the "Events / second" KPI tile increment every ~10 s.
+     Watch the System pulse canvas — coral and teal lines should be moving.
+
+  5. Open the Performance HUD (right column).
+     · Drag the stress slider to 50k.
+     · FPS should stay ≥ 30. Memory should climb but stabilise.
+
+  6. Try the header ⌘K palette, the Bell dropdown, the Settings menu, and
+     the "Share view" button (copies the URL to your clipboard).
+
+If any of those fail, see §10 (Troubleshooting).
+
+--------------------------------------------------------------------------------
+ 8. PROJECT STRUCTURE (for orientation)
+--------------------------------------------------------------------------------
+
+  app/
+    page.tsx                       Landing page (canvas + framer-motion)
+    layout.tsx                     Root layout + <Toaster />
+    loading.tsx / error.tsx        Framework boundaries
+    dashboard/
+      page.tsx                     Server Component (feeds initial data)
+      layout.tsx
+      DashboardClient.tsx          Main dashboard shell (sidebar/header/main)
+    api/data/route.ts              GET/POST for /api/data
+    data-worker.ts                 Web Worker (100 ms telemetry generator)
+    globals.css
+
+  components/
+    charts/                        LineChart, BarChart, ScatterPlot, Heatmap,
+                                   and the shared ChartSurface wrapper
+    controls/                      TimeRangeSelector, FilterPanel
+    ui/                            DataTable, PerformanceMonitor + shadcn/ui
+    views/                         LiveStreamsView, DataExplorerView,
+                                   SavedViewsView
+    providers/DataProvider.tsx     React Context + useTransition + selectors
+
+  hooks/
+    useDataStream.ts               Web Worker adapter + throttled paint
+    useChartRenderer.ts            DPR-aware canvas + rAF loop with cleanup
+    usePerformanceMonitor.ts       FPS, avg frame time, memory (Chromium)
+    useVirtualization.ts           Windowed row indices for large lists
+
+  lib/
+    types.ts                       Shared types + palette
+    dataGenerator.ts               Deterministic seeded telemetry
+    canvasUtils.ts                 Grid, axis labels, DPR sizing, rounded rects
+    performanceUtils.ts            aggregateByBucket, rangePointCount, clamp
+    csvExport.ts                   Shared CSV downloader used by Export buttons
+    userStore.ts                   localStorage hook (name/email/initials)
+
+  README.md                        Overview + feature table + browser matrix
+  PERFORMANCE.md                   Benchmarks + techniques + scaling strategy
+  SETUP.txt                        (this file)
+
+--------------------------------------------------------------------------------
+ 9. OPTIONAL — RUN UNDER SUPERVISOR (production-like local)
+--------------------------------------------------------------------------------
+
+The repo does not ship with a supervisor config, but a minimal one looks like:
+
+  # /etc/supervisor/conf.d/signalroom.conf
+  [program:signalroom]
+  command=/usr/bin/yarn start
+  directory=/app
+  autostart=true
+  autorestart=true
+  stdout_logfile=/var/log/supervisor/signalroom.out.log
+  stderr_logfile=/var/log/supervisor/signalroom.err.log
+  environment=NODE_ENV=production
+
+  # then:
+  sudo supervisorctl reread
+  sudo supervisorctl update
+  sudo supervisorctl start signalroom
+
+--------------------------------------------------------------------------------
+ 10. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+Problem: `yarn dev` fails with EACCES on port 3000
+  → Another process owns 3000. Kill it, or run: PORT=3010 yarn dev
+
+Problem: Blank canvas but sidebar and KPIs render
+  → The Web Worker failed to load. Check the browser console for
+    'Failed to fetch' on `/app/data-worker.ts`. Usually a stale .next/ cache;
+    fix with:  rm -rf .next && yarn dev
+
+Problem: Tailwind classes not applying
+  → Make sure `tailwind.config.js` `content` globs include `.ts` and `.tsx`
+    files (they do in this repo). If you added a new folder, extend the array.
+
+Problem: `performance.memory` says 42 MB forever
+  → That's the fallback value for Firefox / Safari. Chromium shows real MB.
+
+Problem: The /api/data route returns 404
+  → Ensure `app/api/data/route.ts` exists and that you didn't add a competing
+    catch-all route at `app/api/[[...path]]/route.ts` — the specific route
+    must win.
+
+Problem: Landing page keeps looping / no redirect on submit
+  → Open DevTools → Application → Local Storage → confirm the key
+    `signalroom:user` was written after clicking Enter. If not, the browser
+    is blocking storage — check third-party / private mode.
+
+Problem: Ports and URLs on a hosted preview don't match
+  → Update NEXT_PUBLIC_BASE_URL in your .env. Do not hardcode URLs in code.
+
+--------------------------------------------------------------------------------
+ 11. WHAT IS NOT NEEDED
+--------------------------------------------------------------------------------
+
+  · No OpenAI, Anthropic, Gemini, or any AI key.
+  · No Stripe, PayPal, or payment provider.
+  · No SendGrid, Twilio, or comms provider.
+  · No S3, GCS, or file storage bucket.
+  · No auth provider (Auth0, Clerk, Supabase). The landing form is local-only.
+  · No database. MongoDB is imported in package.json from the template but
+    the code never opens a connection. You can remove `mongodb` from
+    package.json if you want a leaner dependency tree.
+
+--------------------------------------------------------------------------------
+ 12. LICENSING & CREDITS
+--------------------------------------------------------------------------------
+
+  Built with: Next.js 15, React 18, TypeScript 5, TailwindCSS, shadcn/ui,
+              framer-motion, lucide-react, sonner.
+  Charts:     hand-rolled Canvas 2D — no chart libs.
+  Data:       synthetic — generated at runtime by the Web Worker.
+
+================================================================================
+ End of SETUP.txt · Questions? Read README.md and PERFORMANCE.md next.
+================================================================================
