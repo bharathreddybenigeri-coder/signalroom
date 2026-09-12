@@ -6,6 +6,9 @@ import DataTable from "@/components/ui/DataTable";
 import PerformanceMonitor from "@/components/ui/PerformanceMonitor";
 import FilterPanel from "@/components/controls/FilterPanel";
 import TimeRangeSelector from "@/components/controls/TimeRangeSelector";
+import LiveStreamsView from "@/components/views/LiveStreamsView";
+import DataExplorerView from "@/components/views/DataExplorerView";
+import SavedViewsView from "@/components/views/SavedViewsView";
 import { CHART_COLORS } from "@/lib/types";
 import {
   Activity,
@@ -270,6 +273,11 @@ export default function DashboardClient() {
         </header>
 
         <div className="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">
+          {activeNav === "Live streams" && <LiveStreamsView />}
+          {activeNav === "Data explorer" && <DataExplorerView />}
+          {activeNav === "Saved views" && <SavedViewsView />}
+          {activeNav === "Overview" && (
+            <>
           <div className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
               <div className="mb-2 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.16em] text-[#ff6b5f]">
@@ -463,6 +471,8 @@ export default function DashboardClient() {
               </div>
             </div>
           </div>
+            </>
+          )}
         </div>
       </main>
     </div>
