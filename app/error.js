@@ -1,2 +1,0 @@
-"use client";
-export default function Error({ reset }) { return <div className="flex min-h-screen items-center justify-center bg-[#f8f8f6] p-6"><div className="rounded-2xl border border-[#e5e5e2] bg-white p-8 text-center shadow-lg"><div className="text-lg font-extrabold">The observatory blinked.</div><p className="mt-2 text-sm text-[#898984]">We could not render this view right now.</p><button onClick={() => reset()} className="mt-5 rounded-xl bg-[#242422] px-4 py-2.5 text-xs font-extrabold text-white">Try again</button></div></div>; }

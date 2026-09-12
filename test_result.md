@@ -316,3 +316,109 @@
 ## agent_communication:
 ##   -agent: "testing"
 ##   -message: "Approved browser suite retest is substantially passing after fixes. Live pulse and CSS/assets are fixed. One automation limitation remains for mobile menu close: aria-label Close navigation is on the backdrop, while the drawer X has no label; use backdrop click force or add a test id/label in a future testability pass."
+## typescript_migration:
+##   - task: "Typed App Router dashboard migration"
+##     implemented: true
+##     working: "NA"
+##     file: "/app/app/page.tsx"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##       -working: "NA"
+##       -agent: "main"
+##       -comment: "Renamed page/layout/loading/error, worker, and catch-all API route to TS/TSX; added typed telemetry, worker message, component prop, and boundary definitions; added TypeScript dependencies and tsconfig. Clean yarn build passes."
+## test_plan:
+##   current_focus:
+##     - "Verify typed /api/data route after route.ts migration"
+##     - "Verify clean TypeScript build and worker bundling"
+##   stuck_tasks: []
+##   test_all: false
+##   test_priority: "high_first"
+## agent_communication:
+##   -agent: "main"
+##   -message: "TypeScript migration is implemented with unchanged interaction markup. Backend validation is required before requesting any frontend retest."
+
+
+## TypeScript migration backend test run 2026-02-14
+##   - task: "Typed /api/data route behavior"
+##     implemented: true
+##     working: true
+##     file: "/app/app/api/[[...path]]/route.ts"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: false
+##     status_history:
+##       -working: true
+##       -agent: "testing"
+##       -comment: "Local supervisor endpoint at http://127.0.0.1:3000/api/data passed all requested checks: default GET 200 with 1200 points; points=24 returns 24; points=1 clamps to 24; points=999999 clamps to 50000; nonnumeric points returns default 1200; POST value 42.5 is accepted; POST missing value safely defaults to 100. Public preview ingress still returns HTTP 403 and is distinct from local app behavior."
+##   - task: "Clean TypeScript build and worker/route bundling"
+##     implemented: true
+##     working: true
+##     file: "/app/app/api/[[...path]]/route.ts; /app/app/data-worker.ts"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: false
+##     status_history:
+##       -working: true
+##       -agent: "testing"
+##       -comment: "Supervisor nextjs is RUNNING. Clean yarn build passed compilation, TypeScript validity checks, page data collection, static generation, and route output; dynamic /api/[[...path]] is emitted. route.ts and data-worker.ts lint clean with no module errors observed in the build."
+## test_plan:
+##   current_focus: []
+##   stuck_tasks: []
+##   test_all: true
+##   test_priority: "high_first"
+## agent_communication:
+##   -agent: "testing"
+##   -message: "TypeScript migration backend validation passed locally. No application source modified. Public preview remains blocked by HTTP 403 only; do not treat that as a local API failure."
+##   -agent: "testing"
+##   -message: "Action items: summarize and finish backend validation; if public API access is required, investigate ingress authorization separately from the Next.js route."
+## frontend_typescript_retest:
+##   approved_by: "user"
+##   scope: "Rerun the full previously passing responsive and interaction suite after TS/TSX migration"
+## frontend_typescript_retest_result:
+##   task: "Realtime Canvas dashboard after TypeScript migration"
+##   working: false
+##   needs_retesting: true
+##   status_history:
+##     -working: false
+##     -agent: "testing"
+##     -comment: "Public preview loaded the dashboard but live Events/second stayed at 1,248 after 1.6 seconds and the first captured canvas appeared blank; the suite stopped before remaining interactions. No console or network errors were reported."
+##   action: "Clear stale Next.js assets and restart supervisor before rerunning the approved suite."
+##   status_update:
+##     -working: "NA"
+##     -agent: "main"
+##     -comment: "Cleared .next and restarted supervisor. Direct preview check now shows styled dashboard, non-blank Canvas line chart, and Events/second changing from 1,264 to 1,257 over 1.5 seconds."
+##   needs_retesting: true
+
+
+## Frontend TypeScript migration browser retest 2026-09-12
+- task: "Realtime Canvas dashboard, worker stream, virtualized table, and performance HUD"
+  implemented: true
+  working: false
+  file: "/app/app/page.tsx"
+  stuck_count: 1
+  priority: "high"
+  needs_retesting: true
+  status_history:
+    -working: false
+    -agent: "testing"
+    -comment: "Approved Playwright suite against NEXT_PUBLIC_BASE_URL loaded the styled dashboard and captured initial desktop screenshot, but failed at the first critical live-update assertion: Events / second remained 1,248 after 1.6s. Canvas appeared blank in captured desktop view. Because live KPI failed, remaining mode/range/stress/pause/gesture/virtualization/responsive assertions were not run in this attempt. No console errors or failed requests were reported before stop. Screenshots requested under /app/.screenshots/ts-retest-2026-08/initial-desktop.png; heatmap/mobile screenshots were not reached."
+- task: "Typed App Router dashboard migration"
+  implemented: true
+  working: false
+  file: "/app/app/page.tsx"
+  stuck_count: 1
+  priority: "high"
+  needs_retesting: true
+  status_history:
+    -working: false
+    -agent: "testing"
+    -comment: "Post-migration public browser retest reproduced no visible worker KPI update after 1.5 seconds; investigate deployed asset/runtime freshness or Worker bundling before retest. The suite could not validate remaining approved interactions due to this blocker."
+- test_plan:
+  current_focus:
+    - "Investigate worker/data stream not updating KPI in public preview after TypeScript migration"
+    - "Retest full approved browser suite including canvas, stress, pause/resume, virtualization, and mobile drawer close"
+- agent_communication:
+  -agent: "testing"
+  -message: "High priority blocker: public preview rendered dashboard but Events / second stayed exactly 1,248 after 1.6s and canvas was blank in screenshot. Verify deployed .next assets and data-worker.ts bundling/runtime; do not mark TS migration frontend pass until live stream is confirmed."

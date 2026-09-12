@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
-const accents = ["#ff6b5f", "#1fb8a8", "#7058d8", "#f4b23e", "#e14da3"];
-const seededValue = (index, series = 0) => 112 + Math.sin(index / 28 + series * 0.8) * 18 + Math.sin(index / 111) * 12 + Math.sin(index / 7.5 + series) * 4 + series * 8;
-const createPoints = (count) => { const now = Date.now(); return Array.from({ length: count }, (_, index) => ({ id: `evt-${now}-${index}`, timestamp: now - (count - index) * 100, value: Math.round(seededValue(index) * 100) / 100, secondary: Math.round(seededValue(index, 1) * 100) / 100, series: index % 5 })); };
+type TelemetryPoint = { id: string; timestamp: number; value: number; secondary: number; series: number };
 
-export async function GET(request) {
+const accents = ["#ff6b5f", "#1fb8a8", "#7058d8", "#f4b23e", "#e14da3"];
+const seededValue = (index: number, series = 0): number => 112 + Math.sin(index / 28 + series * 0.8) * 18 + Math.sin(index / 111) * 12 + Math.sin(index / 7.5 + series) * 4 + series * 8;
+const createPoints = (count: number): TelemetryPoint[] => { const now = Date.now(); return Array.from({ length: count }, (_, index) => ({ id: `evt-${now}-${index}`, timestamp: now - (count - index) * 100, value: Math.round(seededValue(index) * 100) / 100, secondary: Math.round(seededValue(index, 1) * 100) / 100, series: index % 5 })); };
+
+export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const requested = Number(url.searchParams.get("points") || 1200);
@@ -13,7 +15,7 @@ export async function GET(request) {
   } catch (error) { return NextResponse.json({ error: "Unable to create the telemetry snapshot." }, { status: 500 }); }
 }
 
-export async function POST(request) {
+export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const value = Number(body?.value);

@@ -11,20 +11,23 @@ const STABLE_NOW = 1710000000000;
 const formatNumber = (value, digits = 0) => new Intl.NumberFormat("en-US", { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value);
 const formatTime = (timestamp) => new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(timestamp);
 const fallbackPoint = (index) => ({ id: `fallback-${index}`, timestamp: STABLE_NOW - (INITIAL_POINTS - index) * 100, value: 112 + Math.sin(index / 28) * 18 + Math.sin(index / 7.5) * 4, secondary: 120 + Math.sin(index / 32) * 16, series: index % 5 });
+type Point = ReturnType<typeof fallbackPoint>;
+type HoverState = { point?: Point; x: number; y: number } | null;
+type IconComponent = React.ComponentType<{ size?: number; strokeWidth?: number }>;
 
-function Sparkline({ color, points = [] }) {
+function Sparkline({ color, points = [] }: { color: string; points?: number[] }) {
   const min = points.length ? Math.min(...points) : 0; const max = points.length ? Math.max(...points) : 1;
   const path = points.length ? points.map((point, index) => `${index ? "L" : "M"}${(index / Math.max(points.length - 1, 1)) * 100},${58 - ((point - min) / Math.max(max - min, 1)) * 48}`).join(" ") : "M0,48 L25,38 L50,43 L75,18 L100,26";
   return <svg viewBox="0 0 100 64" className="h-14 w-28 overflow-visible" preserveAspectRatio="none" aria-hidden="true"><path d={path} fill="none" stroke={color} strokeWidth="2.8" strokeLinecap="round" vectorEffect="non-scaling-stroke" /><path d={`${path} L100,64 L0,64 Z`} fill={color} opacity=".08" /></svg>;
 }
 
-function MetricCard({ label, value, change, color, icon: Icon, points, suffix = "" }) {
+function MetricCard({ label, value, change, color, icon: Icon, points, suffix = "" }: { label: string; value: string; change: string; color: string; icon: IconComponent; points: number[]; suffix?: string }) {
   const positive = !String(change).startsWith("-");
   return <div className="group relative overflow-hidden rounded-[18px] border border-[#e9e9e7] bg-white p-5 shadow-[0_5px_0_#e9e9e7,0_16px_34px_rgba(20,20,30,0.07)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_7px_0_#e5e5e2,0_22px_42px_rgba(20,20,30,0.1)]"><div className="absolute right-0 top-0 h-24 w-24 rounded-full opacity-10 blur-2xl" style={{ backgroundColor: color }} /><div className="relative flex items-start justify-between gap-3"><div><div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.13em] text-[#8c8c89]"><span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}18`, color }}><Icon size={15} /></span>{label}</div><div className="flex items-baseline gap-1 text-[29px] font-extrabold tracking-[-0.06em] text-[#181817]">{value}<span className="text-sm font-semibold tracking-normal text-[#8c8c89]">{suffix}</span></div><div className={`mt-2 flex items-center gap-1 text-xs font-bold ${positive ? "text-[#18a18e]" : "text-[#e15b54]"}`}>{positive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{change} <span className="font-medium text-[#aaa9a5]">vs last hour</span></div></div><Sparkline color={color} points={points} /></div></div>;
 }
 
-function DataCanvas({ points, mode, onHover, paused }) {
-  const canvasRef = useRef(null); const wrapperRef = useRef(null); const dataRef = useRef(points); const viewRef = useRef({ zoom: 1, offset: 0 }); const pointerRef = useRef({ down: false, x: 0 });
+function DataCanvas({ points, mode, onHover, paused }: { points: Point[]; mode: string; onHover: (value: HoverState) => void; paused: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null); const wrapperRef = useRef<HTMLDivElement | null>(null); const dataRef = useRef<Point[]>(points); const viewRef = useRef({ zoom: 1, offset: 0 }); const pointerRef = useRef({ down: false, x: 0 });
   const [size, setSize] = useState({ width: 800, height: 330 });
   useEffect(() => { dataRef.current = points; }, [points]);
   useEffect(() => { const node = wrapperRef.current; if (!node) return undefined; const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: Math.max(entry.contentRect.height, 280) })); observer.observe(node); return () => observer.disconnect(); }, []);
@@ -71,7 +74,7 @@ export default function App() {
   const [mode, setMode] = useState("line"); const [range, setRange] = useState("30m"); const [bucket, setBucket] = useState("1m"); const [stress, setStress] = useState(INITIAL_POINTS); const [eventPulse, setEventPulse] = useState(0); const [paused, setPaused] = useState(false); const [fps, setFps] = useState(60); const [memory, setMemory] = useState(42); const [hover, setHover] = useState(null); const [mobileNav, setMobileNav] = useState(false); const [activeNav, setActiveNav] = useState("Overview");
   useEffect(() => { pausedRef.current = paused; }, [paused]);
   useEffect(() => { stressRef.current = stress; }, [stress]);
-  useEffect(() => { const worker = new Worker(new URL("./data-worker.js", import.meta.url)); workerRef.current = worker; worker.onmessage = (event) => { const { type, points: initial, point } = event.data; if (type === "init") { pointsRef.current = initial; setPoints(initial); } if (type === "tick" && !pausedRef.current) { pointsRef.current = [...pointsRef.current.slice(-stressRef.current + 1), point]; setEventPulse((current) => (current + 1) % 20); if (Date.now() - lastPaintRef.current > 220) { setPoints(pointsRef.current); lastPaintRef.current = Date.now(); } } }; worker.postMessage({ type: "start", count: INITIAL_POINTS }); return () => worker.terminate(); }, []);
+  useEffect(() => { const worker = new Worker(new URL("./data-worker.ts", import.meta.url)); workerRef.current = worker; worker.onmessage = (event) => { const { type, points: initial, point } = event.data; if (type === "init") { pointsRef.current = initial; setPoints(initial); } if (type === "tick" && !pausedRef.current) { pointsRef.current = [...pointsRef.current.slice(-stressRef.current + 1), point]; setEventPulse((current) => (current + 1) % 20); if (Date.now() - lastPaintRef.current > 220) { setPoints(pointsRef.current); lastPaintRef.current = Date.now(); } } }; worker.postMessage({ type: "start", count: INITIAL_POINTS }); return () => worker.terminate(); }, []);
   useEffect(() => { workerRef.current?.postMessage({ type: "resize", count: stress }); }, [stress]);
   useEffect(() => { setMemory(Math.round(38 + stress / 1500 + (fps < 50 ? 3 : 0))); }, [stress, fps]);
   useEffect(() => { let frame; let last = performance.now(); let frames = 0; const measure = (now) => { frames += 1; if (now - last > 1000) { setFps(Math.min(60, frames)); frames = 0; last = now; } frame = requestAnimationFrame(measure); }; frame = requestAnimationFrame(measure); return () => cancelAnimationFrame(frame); }, []);
