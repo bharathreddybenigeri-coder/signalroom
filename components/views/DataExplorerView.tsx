@@ -3,7 +3,9 @@ import { memo, useMemo, useState } from "react";
 import { useDashboard } from "@/components/providers/DataProvider";
 import { useVirtualization } from "@/hooks/useVirtualization";
 import { CHART_COLORS, SERIES_LABELS, TelemetryPoint } from "@/lib/types";
+import { downloadCsv } from "@/lib/csvExport";
 import { ArrowDown, ArrowUp, Download, Search } from "lucide-react";
+import { toast } from "sonner";
 
 const formatNumber = (n: number, d = 0) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: d, minimumFractionDigits: d }).format(n);
@@ -18,14 +20,9 @@ function toCsv(rows: TelemetryPoint[]): string {
   return `${header}\n${body}`;
 }
 
-function downloadCsv(rows: TelemetryPoint[]) {
-  const blob = new Blob([toCsv(rows)], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `signalroom-${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+function handleExport(rows: TelemetryPoint[]) {
+  downloadCsv(rows, `signalroom-explorer-${Date.now()}.csv`);
+  toast.success("Exported", { description: `${rows.length} rows saved as CSV` });
 }
 
 function DataExplorerViewImpl() {
@@ -102,7 +99,7 @@ function DataExplorerViewImpl() {
           <p className="mt-3 max-w-lg text-sm leading-6 text-[#858580]">Every point from the current filter set. Sort, search, and export the slice you care about.</p>
         </div>
         <button
-          onClick={() => downloadCsv(rows)}
+          onClick={() => handleExport(rows)}
           className="flex h-11 items-center gap-2 rounded-xl bg-[#242422] px-4 text-xs font-extrabold text-white shadow-[0_4px_0_#c5c5bf] transition hover:-translate-y-0.5"
         >
           <Download size={13} />

@@ -3,7 +3,9 @@ import { memo } from "react";
 import { useDashboard } from "@/components/providers/DataProvider";
 import { useVirtualization } from "@/hooks/useVirtualization";
 import { CHART_COLORS, SERIES_LABELS } from "@/lib/types";
+import { downloadCsv } from "@/lib/csvExport";
 import { Download } from "lucide-react";
+import { toast } from "sonner";
 
 const formatNumber = (n: number, d = 0) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: d, minimumFractionDigits: d }).format(n);
@@ -34,7 +36,13 @@ function DataTableImpl() {
             Virtualized · newest first · {formatNumber(rows.length)} rows
           </p>
         </div>
-        <button className="flex items-center gap-1.5 rounded-lg border border-[#e6e6e3] px-3 py-2 text-xs font-bold text-[#646460] transition hover:bg-[#f7f7f5]">
+        <button
+          onClick={() => {
+            downloadCsv(rows, `signalroom-stream-${Date.now()}.csv`);
+            toast.success("Exported", { description: `${rows.length} rows saved as CSV` });
+          }}
+          className="flex items-center gap-1.5 rounded-lg border border-[#e6e6e3] px-3 py-2 text-xs font-bold text-[#646460] transition hover:bg-[#f7f7f5] hover:-translate-y-px"
+        >
           <Download size={13} />
           Export
         </button>

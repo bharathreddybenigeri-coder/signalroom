@@ -1,5 +1,7 @@
 "use client";
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useDashboard } from "@/components/providers/DataProvider";
 import ChartSurface from "@/components/charts/ChartSurface";
 import DataTable from "@/components/ui/DataTable";
@@ -9,13 +11,17 @@ import TimeRangeSelector from "@/components/controls/TimeRangeSelector";
 import LiveStreamsView from "@/components/views/LiveStreamsView";
 import DataExplorerView from "@/components/views/DataExplorerView";
 import SavedViewsView from "@/components/views/SavedViewsView";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CHART_COLORS } from "@/lib/types";
+import { clearUser, firstName as pickFirstName, initials as pickInitials, readUser, useUser } from "@/lib/userStore";
 import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
   BarChart3,
   Bell,
+  Check,
   Clock3,
   Command,
   Cpu,
@@ -23,14 +29,20 @@ import {
   Grid3X3,
   Layers3,
   LineChart,
+  LogOut,
   Maximize2,
   Menu,
+  Moon,
   MoreHorizontal,
   Radio,
   Search,
   Settings2,
+  Share2,
   Sparkles,
+  Sun,
   Table2,
+  Volume2,
+  VolumeX,
   X,
   ZoomIn,
 } from "lucide-react";
@@ -124,6 +136,9 @@ const MetricCard = memo(function MetricCard({
 });
 
 export default function DashboardClient() {
+  const router = useRouter();
+  const { user, setUser, hydrated } = useUser();
+
   const {
     visiblePoints,
     mode,
@@ -136,10 +151,74 @@ export default function DashboardClient() {
     filters,
     toggleSeries,
     setStress,
+    paused,
+    setPaused,
+    fps,
   } = useDashboard();
   const [mobileNav, setMobileNav] = useState(false);
   const [activeNav, setActiveNav] = useState("Overview");
   const [activeCollection, setActiveCollection] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [notifications, setNotifications] = useState([
+    { id: "n1", tone: "amber", title: "P95 latency crossed 55ms", body: "Event pipeline · 12s ago", unread: true },
+    { id: "n2", tone: "teal", title: "Saved view applied", body: "“Steady baseline” · 2m ago", unread: true },
+    { id: "n3", tone: "violet", title: "Warehouse sync recovered", body: "96.8% → 99.1% · 4m ago", unread: false },
+    { id: "n4", tone: "coral", title: "Anomaly spike detected", body: "Series #3 crossed +2σ · 7m ago", unread: false },
+  ]);
+  const unreadCount = notifications.filter((n) => n.unread).length;
+
+  // Redirect to landing if no user
+  useEffect(() => {
+    if (hydrated && !user) router.replace("/");
+  }, [hydrated, user, router]);
+
+  // ⌘K / Ctrl+K opens the search palette
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+      if (e.key === "Escape") setSearchOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const displayName = user?.name ?? "friend";
+  const firstName = pickFirstName(displayName);
+  const userInitials = pickInitials(displayName);
+
+  const greetingWord = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 5) return "Still up";
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  }, []);
+
+  const shareView = async () => {
+    try {
+      const url = typeof window !== "undefined" ? window.location.href : "";
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied", { description: "This view is now on your clipboard." });
+    } catch {
+      toast.error("Couldn't copy the link", { description: "Try selecting the URL manually." });
+    }
+  };
+
+  const markAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    toast.success("Cleared", { description: "All notifications marked as read." });
+  };
+
+  const signOut = () => {
+    clearUser();
+    setUser(null);
+    toast("Signed out", { description: "See you soon." });
+    router.push("/");
+  };
 
   const values = useMemo(() => visiblePoints.map((p) => p.value), [visiblePoints]);
   const average = values.length ? values.reduce((s, v) => s + v, 0) / values.length : 0;
@@ -165,7 +244,7 @@ export default function DashboardClient() {
     {
       id: "experiment",
       label: "Experiment lab",
-      description: "Full spectrum \u00b7 stress",
+      description: "Full spectrum · stress",
       color: "#f4b23e",
       preset: { mode: "heatmap" as const, range: "24h" as const, bucket: "5m" as const, series: [0, 1, 2, 3, 4], stress: 50000 },
     },
@@ -298,12 +377,12 @@ export default function DashboardClient() {
         <div className="mt-auto rounded-[16px] border border-[#e6e6e3] bg-white p-3.5 shadow-[0_3px_0_#e8e8e5]">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#ffebe7] text-[10px] font-extrabold text-[#e15b54]">
-              JD
+              {userInitials}
             </div>
             <span className="h-2 w-2 rounded-full bg-[#1fb8a8]" />
           </div>
-          <div className="text-xs font-extrabold">Jordan Davis</div>
-          <div className="mt-0.5 text-[10px] text-[#aaa9a4]">Personal workspace</div>
+          <div className="text-xs font-extrabold">{displayName}</div>
+          <div className="mt-0.5 text-[10px] text-[#aaa9a4]">{user?.email ?? "Personal workspace"}</div>
         </div>
       </aside>
       {mobileNav && (
@@ -331,23 +410,139 @@ export default function DashboardClient() {
                 <span className="text-[#555550]">Overview</span>
               </div>
               <h1 className="mt-0.5 text-lg font-extrabold tracking-[-.04em]">
-                Good morning, Jordan <span className="text-[#ff6b5f]">.</span>
+                {greetingWord}, {firstName} <span className="text-[#ff6b5f]">.</span>
               </h1>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <button className="hidden items-center gap-2 rounded-lg border border-[#e2e2df] bg-white px-3 py-2 text-xs font-bold text-[#8b8b86] shadow-[0_2px_0_#e8e8e5] transition hover:-translate-y-px sm:flex">
+            <button
+              onClick={() => setSearchOpen(true)}
+              data-testid="header-search"
+              aria-label="Open search"
+              className="hidden items-center gap-2 rounded-lg border border-[#e2e2df] bg-white px-3 py-2 text-xs font-bold text-[#8b8b86] shadow-[0_2px_0_#e8e8e5] transition hover:-translate-y-px sm:flex"
+            >
               <Search size={14} />
               Search
               <kbd className="ml-2 rounded border border-[#e5e5e2] px-1.5 py-0.5 text-[9px] text-[#aaa9a4]">⌘ K</kbd>
             </button>
-            <button className="relative rounded-lg p-2 text-[#777772] hover:bg-white" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#ff6b5f] ring-2 ring-[#f8f8f6]" />
+            <button
+              onClick={() => setSearchOpen(true)}
+              aria-label="Open search"
+              className="rounded-lg p-2 text-[#777772] hover:bg-white sm:hidden"
+            >
+              <Search size={18} />
             </button>
-            <button className="rounded-lg p-2 text-[#777772] hover:bg-white" aria-label="Settings">
-              <Settings2 size={18} />
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  data-testid="header-bell"
+                  className="relative rounded-lg p-2 text-[#777772] transition hover:bg-white"
+                  aria-label="Notifications"
+                >
+                  <Bell size={18} />
+                  {unreadCount > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#ff6b5f] px-1 text-[9px] font-extrabold text-white ring-2 ring-[#f8f8f6]">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={8} className="w-[340px] rounded-2xl border border-[#e6e6e3] bg-white p-0 shadow-[0_5px_0_#e9e9e6,0_18px_40px_rgba(25,25,30,.10)]">
+                <div className="flex items-center justify-between border-b border-[#f0f0ed] px-4 py-3">
+                  <div>
+                    <div className="text-sm font-extrabold tracking-[-.02em]">Notifications</div>
+                    <div className="text-[10px] font-bold text-[#a0a09b]">{unreadCount} unread · {notifications.length} total</div>
+                  </div>
+                  <button
+                    onClick={markAllRead}
+                    className="rounded-md bg-[#faf9f7] px-2 py-1 text-[10px] font-extrabold text-[#7058d8] transition hover:bg-[#f0edff]"
+                  >
+                    Mark all read
+                  </button>
+                </div>
+                <div className="max-h-[360px] overflow-auto">
+                  {notifications.map((n) => {
+                    const toneColor: Record<string, string> = {
+                      amber: "#f4b23e",
+                      teal: "#1fb8a8",
+                      violet: "#7058d8",
+                      coral: "#ff6b5f",
+                    };
+                    return (
+                      <div
+                        key={n.id}
+                        className={`flex items-start gap-3 border-b border-[#f5f5f2] px-4 py-3 transition hover:bg-[#fbfbfa] ${n.unread ? "bg-white" : "bg-[#fcfcfa]/40"}`}
+                      >
+                        <span className="mt-1 flex h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: toneColor[n.tone] }} />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[12px] font-extrabold tracking-[-.02em] ${n.unread ? "text-[#242422]" : "text-[#8b8b86]"}`}>{n.title}</span>
+                            {n.unread && <span className="rounded-full bg-[#ff6b5f]/10 px-1.5 py-0.5 text-[8px] font-extrabold text-[#ff6b5f]">NEW</span>}
+                          </div>
+                          <div className="mt-0.5 text-[11px] font-medium text-[#a0a09b]">{n.body}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="border-t border-[#f0f0ed] px-4 py-2.5 text-center text-[10px] font-bold text-[#a0a09b]">Live alerts appear here</div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  data-testid="header-settings"
+                  className="rounded-lg p-2 text-[#777772] transition hover:bg-white"
+                  aria-label="Settings"
+                >
+                  <Settings2 size={18} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={8} className="w-[280px] rounded-2xl border border-[#e6e6e3] bg-white p-2 shadow-[0_5px_0_#e9e9e6,0_18px_40px_rgba(25,25,30,.10)]">
+                <div className="border-b border-[#f0f0ed] px-3 py-2.5">
+                  <div className="text-[10px] font-extrabold uppercase tracking-[.13em] text-[#a0a09b]">Signed in as</div>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#ffebe7] text-[10px] font-extrabold text-[#e15b54]">{userInitials}</span>
+                    <div className="flex-1">
+                      <div className="text-xs font-extrabold">{displayName}</div>
+                      <div className="text-[10px] text-[#a0a09b]">{user?.email ?? "—"}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="py-1">
+                  <button
+                    onClick={() => setPaused(!paused)}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-bold text-[#484844] transition hover:bg-[#faf9f7]"
+                  >
+                    <span className="flex items-center gap-2">{paused ? <VolumeX size={14} /> : <Volume2 size={14} />} Realtime stream</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold ${paused ? "bg-[#f5f5f2] text-[#a0a09b]" : "bg-[#eaf8f5] text-[#159887]"}`}>{paused ? "Paused" : "Live"}</span>
+                  </button>
+                  <button
+                    onClick={() => toast("Dark mode is on the roadmap", { description: "For now, the observatory stays bright." })}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-bold text-[#484844] transition hover:bg-[#faf9f7]"
+                  >
+                    <span className="flex items-center gap-2"><Moon size={14} /> Appearance</span>
+                    <span className="flex items-center gap-1 text-[10px] font-extrabold text-[#a0a09b]"><Sun size={12} className="text-[#f4b23e]" /> Light</span>
+                  </button>
+                  <button
+                    onClick={() => toast.success("Diagnostics ready", { description: `FPS ${fps} · ${visiblePoints.length} pts loaded` })}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-bold text-[#484844] transition hover:bg-[#faf9f7]"
+                  >
+                    <span className="flex items-center gap-2"><Cpu size={14} /> Run diagnostics</span>
+                    <span className="text-[10px] font-extrabold text-[#7058d8]">Beta</span>
+                  </button>
+                </div>
+                <div className="border-t border-[#f0f0ed] py-1">
+                  <button
+                    onClick={signOut}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-[#e15b54] transition hover:bg-[#fff5f4]"
+                  >
+                    <LogOut size={14} />
+                    Sign out
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </header>
 
@@ -380,8 +575,12 @@ export default function DashboardClient() {
                 <span className="h-2 w-2 animate-pulse rounded-full bg-[#1fb8a8]" />
                 Streaming now
               </div>
-              <button className="flex h-10 items-center gap-2 rounded-xl bg-[#242422] px-4 text-xs font-extrabold text-white shadow-[0_4px_0_#c5c5bf] transition hover:-translate-y-0.5">
-                <Command size={14} />
+              <button
+                onClick={shareView}
+                data-testid="share-view"
+                className="flex h-10 items-center gap-2 rounded-xl bg-[#242422] px-4 text-xs font-extrabold text-white shadow-[0_4px_0_#c5c5bf] transition hover:-translate-y-0.5"
+              >
+                <Share2 size={14} />
                 Share view
               </button>
             </div>
@@ -554,6 +753,124 @@ export default function DashboardClient() {
           )}
         </div>
       </main>
+
+      {/* Command palette */}
+      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <DialogContent className="max-w-[560px] rounded-2xl border border-[#e6e6e3] bg-white p-0 shadow-[0_10px_0_#e9e9e6,0_30px_60px_rgba(25,25,30,.20)]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Search signalroom</DialogTitle>
+          </DialogHeader>
+          <div className="border-b border-[#f0f0ed] px-4 py-3">
+            <div className="flex items-center gap-2 text-[#242422]">
+              <Search size={16} className="text-[#a0a09b]" />
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Jump to a view, mode, collection…"
+                className="w-full bg-transparent text-[15px] font-bold tracking-[-.01em] outline-none placeholder:font-medium placeholder:text-[#c6c6c1]"
+              />
+              <kbd className="rounded border border-[#e5e5e2] bg-[#faf9f7] px-1.5 py-0.5 text-[9px] font-bold text-[#a0a09b]">ESC</kbd>
+            </div>
+          </div>
+          <div className="max-h-[420px] overflow-auto p-2">
+            {(() => {
+              const q = searchQuery.trim().toLowerCase();
+              const results: { section: string; items: { id: string; label: string; hint: string; onSelect: () => void; icon: IconComp }[] }[] = [
+                {
+                  section: "Workspace",
+                  items: navItems
+                    .filter((n) => !q || n.label.toLowerCase().includes(q))
+                    .map((n) => ({
+                      id: `nav-${n.label}`,
+                      label: n.label,
+                      hint: "Open view",
+                      icon: n.icon,
+                      onSelect: () => {
+                        handleNavChange(n.label);
+                        setSearchOpen(false);
+                      },
+                    })),
+                },
+                {
+                  section: "Chart mode",
+                  items: modes
+                    .filter((m) => !q || m.label.toLowerCase().includes(q))
+                    .map((m) => ({
+                      id: `mode-${m.id}`,
+                      label: `${m.label} chart`,
+                      hint: "Switch renderer",
+                      icon: m.icon,
+                      onSelect: () => {
+                        setMode(m.id);
+                        setSearchOpen(false);
+                        toast(`Switched to ${m.label.toLowerCase()}`);
+                      },
+                    })),
+                },
+                {
+                  section: "Collections",
+                  items: collections
+                    .filter((c) => !q || c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q))
+                    .map((c) => ({
+                      id: `coll-${c.id}`,
+                      label: c.label,
+                      hint: c.description,
+                      icon: Sparkles,
+                      onSelect: () => {
+                        applyCollection(c.id);
+                        setSearchOpen(false);
+                        toast.success(`Applied ${c.label}`);
+                      },
+                    })),
+                },
+                {
+                  section: "Actions",
+                  items: [
+                    { id: "act-share", label: "Share view", hint: "Copy URL", icon: Share2, onSelect: () => { setSearchOpen(false); shareView(); } },
+                    { id: "act-pause", label: paused ? "Resume stream" : "Pause stream", hint: paused ? "Restart worker feed" : "Freeze the canvas", icon: paused ? Volume2 : VolumeX, onSelect: () => { setPaused(!paused); setSearchOpen(false); toast(paused ? "Streaming resumed" : "Stream paused"); } },
+                    { id: "act-signout", label: "Sign out", hint: "Return to landing", icon: LogOut, onSelect: () => { setSearchOpen(false); signOut(); } },
+                  ].filter((a) => !q || a.label.toLowerCase().includes(q)),
+                },
+              ].filter((g) => g.items.length > 0);
+
+              if (!results.length) {
+                return (
+                  <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                    <div className="text-sm font-extrabold text-[#242422]">Nothing matches “{searchQuery}”</div>
+                    <div className="text-[11px] text-[#a0a09b]">Try “live”, “bar”, or “growth”</div>
+                  </div>
+                );
+              }
+
+              return results.map((g) => (
+                <div key={g.section} className="mb-2">
+                  <div className="px-2 pb-1 pt-2 text-[9px] font-extrabold uppercase tracking-[.15em] text-[#a3a29e]">{g.section}</div>
+                  {g.items.map((it) => (
+                    <button
+                      key={it.id}
+                      onClick={it.onSelect}
+                      className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition hover:bg-[#faf9f7]"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#faf9f7] text-[#7058d8]">
+                        <it.icon size={14} />
+                      </span>
+                      <span className="flex flex-1 flex-col leading-tight">
+                        <span className="text-[13px] font-extrabold tracking-[-.02em] text-[#242422]">{it.label}</span>
+                        <span className="text-[10px] font-medium text-[#a0a09b]">{it.hint}</span>
+                      </span>
+                      <Check size={12} className="text-transparent" />
+                    </button>
+                  ))}
+                </div>
+              ));
+            })()}
+          </div>
+          <div className="border-t border-[#f0f0ed] px-4 py-2.5 text-[10px] font-bold text-[#a0a09b]">
+            Tip: <kbd className="mx-1 rounded border border-[#e5e5e2] bg-[#faf9f7] px-1.5 py-0.5">⌘ K</kbd> anywhere to reopen
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
