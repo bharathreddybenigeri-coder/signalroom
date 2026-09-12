@@ -124,15 +124,70 @@ const MetricCard = memo(function MetricCard({
 });
 
 export default function DashboardClient() {
-  const { visiblePoints, mode, setMode, hover, bucket, aggregatedPoints } = useDashboard();
+  const {
+    visiblePoints,
+    mode,
+    setMode,
+    hover,
+    bucket,
+    setBucket,
+    aggregatedPoints,
+    setRange,
+    filters,
+    toggleSeries,
+    setStress,
+  } = useDashboard();
   const [mobileNav, setMobileNav] = useState(false);
   const [activeNav, setActiveNav] = useState("Overview");
+  const [activeCollection, setActiveCollection] = useState<string | null>(null);
 
   const values = useMemo(() => visiblePoints.map((p) => p.value), [visiblePoints]);
   const average = values.length ? values.reduce((s, v) => s + v, 0) / values.length : 0;
   const peak = values.length ? values.reduce((m, v) => Math.max(m, v), -Infinity) : 0;
   const sparkValues = useMemo(() => visiblePoints.slice(-18).map((p) => p.value), [visiblePoints]);
   const eventPulse = visiblePoints.length % 20;
+
+  const collections = [
+    {
+      id: "production",
+      label: "Production health",
+      description: "API + baseline latency",
+      color: "#1fb8a8",
+      preset: { mode: "line" as const, range: "30m" as const, bucket: "raw" as const, series: [0, 1], stress: 3000, view: "Overview" as const },
+    },
+    {
+      id: "growth",
+      label: "Growth signals",
+      description: "Signal + anomaly trend",
+      color: "#7058d8",
+      preset: { mode: "scatter" as const, range: "2h" as const, bucket: "1m" as const, series: [2, 3], stress: 15000, view: "Live streams" as const },
+    },
+    {
+      id: "experiment",
+      label: "Experiment lab",
+      description: "Full spectrum \u00b7 stress",
+      color: "#f4b23e",
+      preset: { mode: "heatmap" as const, range: "24h" as const, bucket: "5m" as const, series: [0, 1, 2, 3, 4], stress: 50000, view: "Data explorer" as const },
+    },
+  ];
+
+  const applyCollection = (collectionId: string) => {
+    const c = collections.find((x) => x.id === collectionId);
+    if (!c) return;
+    setActiveCollection(collectionId);
+    setMode(c.preset.mode);
+    setRange(c.preset.range);
+    setBucket(c.preset.bucket);
+    setStress(c.preset.stress);
+    setActiveNav(c.preset.view);
+    setMobileNav(false);
+    const target = new Set(c.preset.series);
+    [0, 1, 2, 3, 4].forEach((s) => {
+      const on = filters.activeSeries.has(s);
+      const shouldBeOn = target.has(s);
+      if (on !== shouldBeOn) toggleSeries(s);
+    });
+  };
 
   const modes = [
     { id: "line" as const, label: "Line", icon: LineChart },
@@ -203,18 +258,39 @@ export default function DashboardClient() {
           Collections
         </div>
         <div className="space-y-1 px-2">
-          <button className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-xs font-bold text-[#70706c] hover:bg-white">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#1fb8a8]" />
-            Production health
-          </button>
-          <button className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-xs font-bold text-[#70706c] hover:bg-white">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#7058d8]" />
-            Growth signals
-          </button>
-          <button className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-xs font-bold text-[#70706c] hover:bg-white">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#f4b23e]" />
-            Experiment lab
-          </button>
+          {collections.map((c) => {
+            const isActive = activeCollection === c.id;
+            return (
+              <button
+                key={c.id}
+                onClick={() => applyCollection(c.id)}
+                data-testid={`collection-${c.id}`}
+                aria-pressed={isActive}
+                title={`Apply ${c.label} preset`}
+                className={`group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-xs font-bold transition ${
+                  isActive
+                    ? "bg-white text-[#242422] shadow-[0_2px_0_#e7e7e4]"
+                    : "text-[#70706c] hover:bg-white hover:text-[#242422]"
+                }`}
+              >
+                <span
+                  className={`h-2.5 w-2.5 rounded-full transition-transform ${
+                    isActive ? "ring-2 ring-offset-2 ring-offset-[#fbfbfa]" : "group-hover:scale-125"
+                  }`}
+                  style={{ backgroundColor: c.color, boxShadow: isActive ? `0 0 0 1.5px ${c.color}` : "none" }}
+                />
+                <span className="flex flex-1 flex-col leading-tight">
+                  <span>{c.label}</span>
+                  <span className="text-[9px] font-medium text-[#aaa9a4]">{c.description}</span>
+                </span>
+                {isActive && (
+                  <span className="rounded-full bg-[#eaf8f5] px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-[.13em] text-[#159887]">
+                    on
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <div className="mt-auto rounded-[16px] border border-[#e6e6e3] bg-white p-3.5 shadow-[0_3px_0_#e8e8e5]">
           <div className="mb-3 flex items-center justify-between">
